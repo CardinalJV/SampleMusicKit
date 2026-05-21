@@ -10,19 +10,24 @@ import MusicKit
 
 struct ArtworkComponentView: View {
     
-    let artwork: Artwork
+    let artwork: Artwork?
     let width: CGFloat
     let height: CGFloat
     
     var body: some View {
-        AsyncImage(url: artwork.url(width: 150, height: 150)) { image in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: self.width, height: self.height)
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-        } placeholder: {
-            ProgressView()
+        if let artwork = self.artwork {
+            AsyncImage(url: artwork.url(width: 150, height: 150)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: self.width, height: self.height)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+            } placeholder: {
+                ProgressView()
+                    .frame(width: self.width, height: self.height)
+            }
+        } else {
+            Image(systemName: "photo")
                 .frame(width: self.width, height: self.height)
         }
     }
