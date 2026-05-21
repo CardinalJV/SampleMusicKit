@@ -26,6 +26,27 @@ struct ContentView: View {
     private var showError = false
     @State
     private var showMusicView = false
+    @State
+    private var filterByYear: Int?
+    
+    let years: [Int] = [1960, 1970, 1980, 1990, 2000, 2010, 2020]
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                ForEach(self.years, id: \.self) { year in
+                    Button(String(year)) {
+                        self.filterByYear = year
+                    }
+                    .foregroundStyle(self.filterByYear == year ? .blue : .primary)
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .foregroundStyle((self.filterByYear != nil) ? Color.blue : Color.primary )
+            }
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -64,11 +85,21 @@ struct ContentView: View {
                     MusicPlaybackView(artwork: playlist.artwork, playlist: playlist)
                 }
             }
+            .toolbar {
+                self.toolbarContent
+            }
         }
         .onAppear {
             Task {
                 await self.requestMusicAuthorization()
                 try await self.fetchMainPlaylists(year: 2010)
+            }
+        }
+        .onChange(of: self.filterByYear) {
+            Task {
+                if let year = self.filterByYear {
+                    try await self.fetchMainPlaylists(year: year)
+                }
             }
         }
     }

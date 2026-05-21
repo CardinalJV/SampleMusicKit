@@ -10,12 +10,14 @@ import MusicKit
 
 struct MusicPlaybackView: View {
     
-    let musicPlayer = ApplicationMusicPlayer.self
+    @Environment(\.scenePhase)
+    private var scenePhase
+    @Environment(\.dismiss)
+    private var dismiss
+    let musicPlayer = ApplicationMusicPlayer.shared
     let artwork: Artwork?
     let playlist: Playlist?
     
-    @State
-    private var isPlaying = false
     @State
     private var songs: [Song] = []
     @State
@@ -29,6 +31,13 @@ struct MusicPlaybackView: View {
         }
     }
     
+//    private var isPlaying: Bool {
+//        return self.musicPlayer.state.playbackStatus == .playing
+//    }
+    
+    @State
+    private var isPlaying = false
+    @ViewBuilder
     private var songInfos: some View {
         HStack {
             ArtworkComponentView(artwork: self.artwork, width: 75, height: 75)
@@ -42,14 +51,17 @@ struct MusicPlaybackView: View {
                 }
             }
             Spacer()
+            Image(systemName: "waveform")
+                .font(.title)
+                .symbolEffect(.variableColor, options: .repeat(.continuous), isActive: self.isPlaying)
         }
         .frame(maxWidth: .infinity)
     }
-    
+    @ViewBuilder
     private var previousButton: some View {
         Button {
             Task {
-                try await self.musicPlayer.shared.skipToPreviousEntry()
+                try await self.musicPlayer.skipToPreviousEntry()
                 if self.index != 0 {
                     self.index -= 1
                 }
@@ -61,18 +73,18 @@ struct MusicPlaybackView: View {
                 .font(.largeTitle)
         }
     }
-    
+    @ViewBuilder
     private var playButton: some View {
         Button {
             if self.isPlaying {
+                self.isPlaying = false
                 Task {
-                    self.musicPlayer.shared.pause()
-                    self.isPlaying = false
+                    self.musicPlayer.pause()
                 }
             } else {
+                self.isPlaying = true
                 Task {
-                    try await self.musicPlayer.shared.play()
-                    self.isPlaying = true
+                    try await self.musicPlayer.play()
                 }
             }
         } label: {
@@ -81,11 +93,11 @@ struct MusicPlaybackView: View {
                 .padding()
         }
     }
-    
+    @ViewBuilder
     private var nextButton: some View {
         Button {
             Task {
-                try await self.musicPlayer.shared.skipToNextEntry()
+                try await self.musicPlayer.skipToNextEntry()
                 if self.index != self.songs.count - 1 {
                     self.index += 1
                 } else {
@@ -112,32 +124,48 @@ struct MusicPlaybackView: View {
                     self.nextButton
                 }
                 .padding()
+                .foregroundStyle(.primary)
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(.white)
+            .background(Color(.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 20))
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGray6))
         .onAppear {
             self.index = 0
-            if !self.songs.isEmpty {
-                
-            }
         }
         .task {
             if let playlist = self.playlist {
                 if let songs = await self.loadPlaylistWithSongs(playlist) {
                     self.songs = songs
-                    self.musicPlayer.shared.queue = ApplicationMusicPlayer.Queue(for: songs)
+                    self.musicPlayer.queue = ApplicationMusicPlayer.Queue(for: songs)
                 }
             }
         }
-        .onDisappear {
-            self.musicPlayer.shared.stop()
+        // MARK: - Reset when the app statement change
+        .onChange(of: scenePhase) {
+            self.stopAndClearPlayer()
+            self.dismiss()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: UIApplication.protectedDataWillBecomeUnavailableNotification
+            )
+        ) { _ in
+            self.stopAndClearPlayer()
+            self.dismiss()
+        }
+        .onDisappear {
+            self.stopAndClearPlayer()
+        }
+    }
+    
+    private func stopAndClearPlayer() {
+        self.musicPlayer.stop()
+        self.musicPlayer.queue.entries.removeAll()
+        self.isPlaying = false
     }
     
     private func loadPlaylistWithSongs(_ playlist: Playlist) async -> [Song]? {
@@ -153,6 +181,4 @@ struct MusicPlaybackView: View {
             return nil
         }
     }
-    
-    
 }
