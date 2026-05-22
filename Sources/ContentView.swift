@@ -31,23 +31,6 @@ struct ContentView: View {
     
     let years: [Int] = [1960, 1970, 1980, 1990, 2000, 2010, 2020]
     
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                ForEach(self.years, id: \.self) { year in
-                    Button(String(year)) {
-                        self.filterByYear = year
-                    }
-                    .foregroundStyle(self.filterByYear == year ? .blue : .primary)
-                }
-            } label: {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .foregroundStyle((self.filterByYear != nil) ? Color.blue : Color.primary )
-            }
-        }
-    }
-    
     var body: some View {
         NavigationStack {
             List(self.playlists) { playlist in
@@ -85,39 +68,34 @@ struct ContentView: View {
                     MusicPlaybackView(artwork: playlist.artwork, playlist: playlist)
                 }
             }
-            .toolbar {
-                self.toolbarContent
-            }
         }
         .onAppear {
             Task {
                 await self.requestMusicAuthorization()
-                try await self.fetchMainPlaylists(year: 2010)
+                try await self.fetchMainPlaylists(query: "2026")
             }
         }
-        .onChange(of: self.filterByYear) {
+        .onChange(of: self.query) {
             Task {
-                if let year = self.filterByYear {
-                    try await self.fetchMainPlaylists(year: year)
+                if self.query.isEmpty {
+                    try await self.fetchMainPlaylists(query: "\(Date.now.formatted(.dateTime.year()))")
+                } else {
+                    try await self.fetchMainPlaylists(query: self.query)
                 }
             }
         }
     }
     
-    private func fetchMainPlaylists(year: Int) async throws {
-        let decade = (year / 10) * 10
+    private func fetchMainPlaylists(query: String) async throws {
         var request = MusicCatalogSearchRequest(
-            term: "\(decade)s",
+            term: "\(query)s",
             types: [Playlist.self]
         )
-        request.limit = 25
+        request.limit = 10
+        request.includeTopResults = true
         let response = try await request.response()
-        self.playlists = response.playlists.filter { playlist in
-            playlist.curatorName == "Apple Music" &&
-            playlist.name.contains("\(decade)")
-        }
+        self.playlists = Array(response.playlists)
     }
-    
     private func requestMusicAuthorization() async {
         let status = await MusicAuthorization.request()
         switch status {

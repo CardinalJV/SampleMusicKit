@@ -31,10 +31,6 @@ struct MusicPlaybackView: View {
         }
     }
     
-//    private var isPlaying: Bool {
-//        return self.musicPlayer.state.playbackStatus == .playing
-//    }
-    
     @State
     private var isPlaying = false
     @ViewBuilder
